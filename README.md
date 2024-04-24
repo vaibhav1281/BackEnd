@@ -36,38 +36,37 @@
 6. To connect with  your local MongoDB server you will do the bellow  steps :
 
 ```javascript
-// Import the Mongoose library
-const mongoose = require('mongoose' );
+// Import the mongoose library
+const mongoose = require("mongoose");
 
-// Set the MONGODB_URI constant to the value of the MONGODB_URI environment variable
-const MONGODB_URI = process.env.MONGODB_URI
+// Load environment variables from.env file
+require("dotenv").config();
 
-// Load environment variables from a.env file
-require('dotenv').config();
+// Set the database URL from the environment variable
+const dbUrl = process.env.DATABASE_URL;
 
-// Define a function connectToDataBase that connects to the MongoDB database using the Mongoose library
+// Define a function to connect to the database
 const connectToDataBase = () => {
-
-    // Connect to the MongoDB database using the Mongoose library and the MONGODB_URI connection string
-    mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
+  // Use mongoose to connect to the database using the URL and options
+  mongoose
+   .connect(dbUrl, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     })
 
-    // Log a success message to the console if the connection to the database is successful
-   .then(() => console.log('Connected to MongoDB'))
+    // If the connection is successful, log a message to the console
+   .then(() => console.log("Connected to MongoDB"))
 
-    // Log an error message to the console if there's an error connecting to the database
+    // If there is an error connecting to the database, log an error message and the error to the console, and exit the process
    .catch((error) => {
-        console.log("Error: Failed to connect to MongoDB", error)
-        console.error(error);
-        process.exit(1)
+      console.log("Error: Failed to connect to MongoDB", error);
+      console.error(error);
+      process.exit(1);
     });
-}
+};
 
-// Export the connectToDataBase function so it can be used in other parts of the application
+// Export the connectToDataBase function so it can be used in other files
 module.exports = connectToDataBase;
-
 ```
 # How to create Schema In Model.
  We take an example to Todo Schema:
@@ -88,7 +87,7 @@ const todoSchema = new mongoose.Schema({
     description: {
         type: String,
         required: true,
-        maxLength: 50
+        maxLength: 500
     },
     // Define the createdAt property with type Date, default value as current date, and required true
     createdAt: {
@@ -112,37 +111,78 @@ module.exports = mongoose.model('Todo', todoSchema);
 
 ```javascript
 // Import the Todo model from the models directory
-const Todo = require('../models/todo');
+const Todo = require("../models/todo");
 
-// Export the createTodo function, which will handle creating a new todo item
+// Define an asynchronous function to create a new todo item
 exports.createTodo = async (req, res) => {
-  // Use a try block to attempt to create a new todo item
+  // Use a try-catch block to handle any errors that may occur
   try {
-    // Destructure the title and discription properties from the request body
-    const { title, discription } = req.body;
+    // Destructure the title and description properties from the request body
+    const { title, description } = req.body;
 
-    // Use the Todo model to create a new todo item with the provided title and discription
-    const response = await Todo.create({ title, discription });
+    // Use the Todo model to create a new todo item with the title and description from the request body
+    const response = await Todo.create({ title, description });
 
-    // If the todo item is created successfully, return a 200 status code and a success message
+    // Send a response with a 200 status code, a success message, the created todo item, and a success message
     res.status(200).json({
       success: true,
       data: response,
-      message: "Entry Created Successfully"
+      message: "Created successfully",
     });
-  }
-  // Use a catch block to handle any errors that occur during the creation of the todo item
-  catch (error) {
-    // Log the error to the console for debugging purposes
-    console.error(error);
-    console.log(error);
-
-    // Return a 500 status code and an error message
+  } catch (err) {
+    // If there is an error, log the error to the console and send a response with a 500 status code, a failure message, and the error message
+    console.log(err);
+    console.error(err);
     res.status(500).json({
       success: false,
-      data: 'internal server error',
-      message: error.message,
+      data: "internal server error",
+      message: err.message,
     });
   }
 };
 ```
+#### Now create Routes  for CRUD operations in `routes/todoRoutes.js` file :
+
+```javascript
+// Import the express library and create a new router instance
+const express = require('express');
+const router = express.Router();
+
+// Import the createTodo function from the createTodo controller
+const { createTodo } = require('../controllers/createTodo');
+
+// Define a route for POST requests to /createTodo that handles the request using the createTodo function
+router.post('/createTodo', createTodo);
+
+// Export the router so it can be used in other files
+module.exports = router;
+```
+
+### Now to connect to DB and mounting  routes we need to update `index.js`:
+
+```javascript
+const express = require('express'); // Importing the express module
+const todoRoutes = require('./routes/todoRoutes'); // Importing todo routes from todoRoutes file
+const connectToDataBase = require('./config/database'); // Importing database connection from database file
+
+const app = express(); // Creating an instance of express
+
+require("dotenv").config(); // Configuring environment variables
+app.use(express.json()); // Enabling JSON parsing middleware
+
+const PORT = process.env.PORT || 1234; // Setting the port number from environment variable or defaulting to 1234
+
+app.use('/api/v1', todoRoutes); // Mounting todo routes at /api/v1 endpoint
+
+app.listen(PORT, () => { // Starting the server
+    console.log(`Server is running on port ${PORT}`); // Logging server start message
+});
+
+connectToDataBase(); // Connecting to the database
+
+app.get('/', (req,res) => { // Handling GET request at root endpoint
+    console.log("Testing of server") // Logging server test message
+    res.send(`<h1>testing the server of my app</h1>`); // Sending HTML response
+})
+```
+
